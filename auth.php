@@ -2,7 +2,13 @@
 <?php
 
 if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+    if (headers_sent($file, $line)) {
+        error_log(
+            "SESSION DEBUG: Output started in {$file} on line {$line}"
+        );
+    } else {
+        session_start();
+    }
 }
 
 require_once __DIR__ . "/db.php";
