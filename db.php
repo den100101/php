@@ -1,12 +1,133 @@
+
 <?php
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$conn = new mysqli("localhost", "root", "", "db_website");
+/*
+|--------------------------------------------------------------------------
+| Load local .env file
+|--------------------------------------------------------------------------
+| Render environment variables take priority over local .env values.
+*/
 
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+$envFile = __DIR__ . "/.env";
+
+if (is_file($envFile)) {
+    $envValues = parse_ini_file($envFile, false, INI_SCANNER_RAW);
+
+    if ($envValues === false) {
+        error_log("Unable to parse .env file.");
+        http_response_code(500);
+        exit("Application configuration error.");
+    }
+
+    foreach ($envValues as $key => $value) {
+        if (getenv($key) === false) {
+            putenv($key . "=" . $value);
+            $_ENV[$key] = $value;
+        }
+    }
 }
 
-$conn->set_charset("utf8mb4");
+/*
+|--------------------------------------------------------------------------
+| Database configuration
+|--------------------------------------------------------------------------
+*/
+
+$isProduction = strtolower(getenv("APP_ENV") ?: "development") === "production";
+
+$dbHost = getenv("DB_HOST") ?: "";
+$dbPort = (int) (getenv("DB_PORT") ?: 3306);
+$dbName = getenv("DB_NAME") ?: "";
+$dbUser = getenv("DB_USER") ?: "";
+$dbPassword = getenv("DB_PASSWORD");
+
+if ($dbPassword === false) {
+    $dbPassword = "";
+}
+
+if (
+    $dbHost === "" ||
+    $dbName === "" ||
+    $dbUser === "" ||
+    ($isProduction && $dbPassword === "") ||
+    $dbPort < 1 ||
+    $dbPort > 65535
+) {
+    error_log("Missing or invalid database configuration.");
+    http_response_code(500);
+    exit("Database configuration error.");
+}
+
+/*
+|--------------------------------------------------------------------------
+| Connect to MySQL
+|--------------------------------------------------------------------------
+*/
+
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+try {
+    $conn = mysqli_init();
+
+    if ($conn === false) {
+        throw new RuntimeException("Unable to initialize MySQL connection.");
+    }
+
+    $sslEnabled = filter_var(
+        getenv("DB_SSL") ?: "false",
+        FILTER_VALIDATE_BOOLEAN
+    );
+
+    if ($isProduction && !$sslEnabled) {
+        throw new RuntimeException(
+            "SSL must be enabled for the production database connection."
+        );
+    }
+
+    if ($sslEnabled) {
+        $caFile = getenv("DB_SSL_CA");
+
+        if ($caFile !== false && $caFile !== "") {
+            if (!is_file($caFile) || !is_readable($caFile)) {
+                throw new RuntimeException(
+                    "Configured database CA certificate is unavailable."
+                );
+            }
+
+            $conn->ssl_set(
+                null,
+                null,
+                $caFile,
+                null,
+                null
+            );
+        } elseif ($isProduction) {
+            throw new RuntimeException(
+                "The production database CA certificate is not configured."
+            );
+        }
+    }
+
+    $flags = $sslEnabled ? MYSQLI_CLIENT_SSL : 0;
+
+    $conn->real_connect(
+        $dbHost,
+        $dbUser,
+        $dbPassword,
+        $dbName,
+        $dbPort,
+        null,
+        $flags
+    );
+
+    $conn->set_charset("utf8mb4");
+} catch (Throwable $e) {
+    error_log("Database connection error: " . $e->getMessage());
+
+    http_response_code(500);
+    exit("Unable to connect to the database. Please try again later.");
+}
