@@ -1,15 +1,23 @@
 
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
+/*
+|--------------------------------------------------------------------------
+| Start session safely
+|--------------------------------------------------------------------------
+| Ideally, include this file before any HTML or output.
+*/
+
+if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
     session_start();
+} elseif (session_status() === PHP_SESSION_NONE) {
+    error_log("Session could not start because output was already sent.");
 }
 
 /*
 |--------------------------------------------------------------------------
 | Load local .env file
 |--------------------------------------------------------------------------
-| Render environment variables take priority over local .env values.
 */
 
 $envFile = __DIR__ . "/.env";
@@ -64,7 +72,7 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| Connect to MySQL
+| Connect to Aiven MySQL
 |--------------------------------------------------------------------------
 */
 
@@ -91,24 +99,18 @@ try {
     if ($sslEnabled) {
         $caFile = getenv("DB_SSL_CA");
 
-        if ($caFile !== false && $caFile !== "") {
-            if (!is_file($caFile) || !is_readable($caFile)) {
+        if ($caFile === false || $caFile === "") {
+            if ($isProduction) {
                 throw new RuntimeException(
-                    "Configured database CA certificate is unavailable."
+                    "Production database CA certificate is not configured."
                 );
             }
-
-            $conn->ssl_set(
-                null,
-                null,
-                $caFile,
-                null,
-                null
-            );
-        } elseif ($isProduction) {
+        } elseif (!is_file($caFile) || !is_readable($caFile)) {
             throw new RuntimeException(
-                "The production database CA certificate is not configured."
+                "Database CA certificate is missing or unreadable."
             );
+        } else {
+            $conn->ssl_set(null, null, $caFile, null, null);
         }
     }
 
