@@ -1,6 +1,5 @@
-
 <?php
-
+require_once __DIR__ . "/db.php";
 if (session_status() === PHP_SESSION_NONE) {
     if (headers_sent($file, $line)) {
         error_log(
@@ -11,10 +10,6 @@ if (session_status() === PHP_SESSION_NONE) {
     }
 }
 
-require_once __DIR__ . "/db.php";
-/**
- * Get the current logged-in user's role.
- */
 function current_role(): string
 {
     return ucfirst(strtolower(trim($_SESSION["USERTYPE"] ?? "")));
