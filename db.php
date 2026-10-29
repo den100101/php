@@ -1,17 +1,8 @@
-
 <?php
 
-/*
-|--------------------------------------------------------------------------
-| Start session safely
-|--------------------------------------------------------------------------
-| Ideally, include this file before any HTML or output.
-*/
-
-if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+// Start the session before any output or HTML.
+if (session_status() === PHP_SESSION_NONE) {
     session_start();
-} elseif (session_status() === PHP_SESSION_NONE) {
-    error_log("Session could not start because output was already sent.");
 }
 
 /*
@@ -48,7 +39,7 @@ if (is_file($envFile)) {
 $isProduction = strtolower(getenv("APP_ENV") ?: "development") === "production";
 
 $dbHost = getenv("DB_HOST") ?: "";
-$dbPort = (int) (getenv("DB_PORT") ?: 3306);
+$dbPort = (int)(getenv("DB_PORT") ?: 3306);
 $dbName = getenv("DB_NAME") ?: "";
 $dbUser = getenv("DB_USER") ?: "";
 $dbPassword = getenv("DB_PASSWORD");
@@ -72,7 +63,7 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| Connect to Aiven MySQL
+| Connect to MySQL
 |--------------------------------------------------------------------------
 */
 

@@ -5,6 +5,7 @@
 
 /vendor/
 /node_modules/
+create_accounts.php
 
 # Local and temporary files
 *.log
